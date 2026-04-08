@@ -12,7 +12,6 @@ import { Bar } from "react-chartjs-2";
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 const SERVER_COUNT = 3;
-const MAX_SERVERS = 4;
 const OVERLOAD_THRESHOLD = 6;
 
 export default function App() {
@@ -36,6 +35,7 @@ export default function App() {
 
   const scalingLock = useRef(false);
 
+  // ✅ FIXED INTERVAL
   useEffect(() => {
     if (!running) return;
 
@@ -47,40 +47,48 @@ export default function App() {
     return () => clearInterval(interval);
   }, [running]);
 
-  // ✅ SAME LOGIC — but safer trigger
-  const checkScaling = (servers, setServers) => {
-    const allOverloaded = servers.every(
-      (s) => s.load >= OVERLOAD_THRESHOLD
-    );
+  // ✅ FINAL FIXED SCALING
+  const checkScaling = (setServers) => {
+    setServers((prev) => {
+      const allOverloaded = prev.every(
+        (s) => s.load >= OVERLOAD_THRESHOLD
+      );
 
-    if (!allOverloaded) {
-      scalingLock.current = false;
-      return;
-    }
+      if (!allOverloaded) {
+        scalingLock.current = false;
+        return prev;
+      }
 
-    if (scalingLock.current) return;
+      if (scalingLock.current) return prev;
 
-    scalingLock.current = true;
+      scalingLock.current = true;
 
-    if (servers.length === 3) {
-      setServers((prev) => [
-        ...prev,
-        {
-          id: 4,
-          load: 0,
-          handled: 0,
-          active: true,
-          overloaded: false,
-          redistributing: false,
-          cooldown: 0,
-          message: "🆕 Auto-created",
-          liveSend: "",
-        },
-      ]);
-    } else if (servers.length === 4) {
-      alert("🚨 All servers overloaded! Server creation limit exceeded.");
-      setRunning(false);
-    }
+      // ➤ Create 4th server
+      if (prev.length === 3) {
+        return [
+          ...prev,
+          {
+            id: 4,
+            load: 0,
+            handled: 0,
+            active: true,
+            overloaded: false,
+            redistributing: false,
+            cooldown: 0,
+            message: "🆕 Auto-created",
+            liveSend: "",
+          },
+        ];
+      }
+
+      // ➤ Alert when 4 overloaded
+      if (prev.length === 4) {
+        alert("🚨 All servers overloaded! Server creation limit exceeded.");
+        setRunning(false);
+      }
+
+      return prev;
+    });
   };
 
   const handleOverload = (setServers, index) => {
@@ -94,8 +102,6 @@ export default function App() {
       server.active = false;
       server.cooldown = 5;
       server.redistributing = true;
-      server.message = "";
-      server.liveSend = "";
 
       const excess = server.load - OVERLOAD_THRESHOLD;
       server.load = OVERLOAD_THRESHOLD;
@@ -128,7 +134,6 @@ export default function App() {
               active: true,
               overloaded: false,
               redistributing: false,
-              liveSend: "",
               message: "",
             };
           }
@@ -162,13 +167,12 @@ export default function App() {
           handleOverload(setRrServers, index);
         }
 
-        // ✅ IMPORTANT FIX: use UPDATED data
-        checkScaling(updated, setRrServers);
-
         return updated;
       });
 
-      setRrIndex((prev) => (prev + 1) % MAX_SERVERS);
+      setRrIndex((prev) => (prev + 1) % 4);
+
+      checkScaling(setRrServers);
 
       // LEAST CONNECTIONS
       setLcServers((prev) => {
@@ -188,11 +192,10 @@ export default function App() {
           handleOverload(setLcServers, index);
         }
 
-        // ✅ IMPORTANT FIX
-        checkScaling(updated, setLcServers);
-
         return updated;
       });
+
+      checkScaling(setLcServers);
     }
   };
 
@@ -235,8 +238,7 @@ export default function App() {
       </div>
 
       {!server.active && <p>⏸ STOPPED ({server.cooldown}s)</p>}
-      {server.redistributing && <p>{server.liveSend}</p>}
-      {!server.redistributing && server.message && <p>{server.message}</p>}
+      {server.message && <p>{server.message}</p>}
     </div>
   );
 
