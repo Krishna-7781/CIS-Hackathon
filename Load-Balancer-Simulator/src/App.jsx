@@ -1,3 +1,5 @@
+// FINAL VERCEL-SAFE CODE
+
 import { useState, useEffect, useRef } from "react";
 import {
   Chart as ChartJS,
@@ -143,8 +145,11 @@ export default function App() {
         let updated = [...prev];
         let index = rrIndex;
 
-        while (!updated[index].active) {
+        // ✅ SAFE LOOP
+        let safety = 0;
+        while (!updated[index].active && safety < updated.length) {
           index = (index + 1) % updated.length;
+          safety++;
         }
 
         updated[index].load++;
@@ -158,8 +163,8 @@ export default function App() {
         return updated;
       });
 
-      // ✅ FINAL FIX
-      setRrIndex((prev) => (prev + 1) % MAX_SERVERS);
+      // ✅ SAFE INDEX FIX
+      setRrIndex((prev) => (prev + 1) % Math.max(1, rrServers.length));
 
       setLcServers((prev) => {
         let updated = [...prev];
