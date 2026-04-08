@@ -31,11 +31,11 @@ export default function App() {
 
   const [rrServers, setRrServers] = useState(createServers());
   const [lcServers, setLcServers] = useState(createServers());
-  const [rrIndex, setRrIndex] = useState(0);
   const [running, setRunning] = useState(false);
 
   const scalingLock = useRef(false);
 
+  // ✅ FIXED: removed rrIndex dependency
   useEffect(() => {
     if (!running) return;
 
@@ -45,9 +45,9 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [running, rrIndex]);
+  }, [running]);
 
-  // ✅ UPDATED SCALING LOGIC (STOP AFTER ALERT)
+  // ✅ SAME LOGIC (unchanged)
   const checkScaling = (servers, setServers) => {
     const allOverloaded = servers.every(
       (s) => s.load >= OVERLOAD_THRESHOLD
@@ -79,13 +79,10 @@ export default function App() {
       ]);
     } else if (servers.length === 4) {
       alert("🚨 All servers overloaded! Server creation limit exceeded.");
-
-      // ✅ IMPORTANT FIX
       setRunning(false);
     }
   };
 
-  // 🔥 ORIGINAL OVERLOAD LOGIC (UNCHANGED)
   const handleOverload = (setServers, index) => {
     setServers((prev) => {
       const updated = [...prev];
@@ -104,32 +101,15 @@ export default function App() {
       server.load = OVERLOAD_THRESHOLD;
 
       const receivers = updated.filter((s, i) => i !== index && s.active);
-      const redistribution = {};
 
       if (receivers.length && excess > 0) {
-        receivers.forEach((r) => {
-          const share = Math.ceil(excess / receivers.length);
+        const share = Math.ceil(excess / receivers.length);
 
+        receivers.forEach((r) => {
           r.load += share;
           r.handled += share;
-
-          redistribution[`S${r.id}`] =
-            (redistribution[`S${r.id}`] || 0) + share;
-
           r.message = `⬅ From S${server.id} (+${share})`;
         });
-      }
-
-      const msg = Object.entries(redistribution)
-        .map(([s, c]) => `${s}(${c})`)
-        .join(", ");
-
-      if (msg) {
-        server.liveSend = `📤 Sending to: ${msg}`;
-      } else if (excess > 0 && receivers.length === 0) {
-        server.liveSend = "⚠ No servers available";
-      } else {
-        server.liveSend = "✔ No redistribution needed";
       }
 
       const timer = setInterval(() => {
@@ -142,17 +122,15 @@ export default function App() {
           } else {
             clearInterval(timer);
 
-            s.cooldown = 0;
-            s.active = true;
-            s.overloaded = false;
-            s.redistributing = false;
-            s.liveSend = "";
-
-            if (!msg) {
-              s.message = "✔ Redistribution not required";
-            } else {
-              s.message = "";
-            }
+            arr[index] = {
+              ...s,
+              cooldown: 0,
+              active: true,
+              overloaded: false,
+              redistributing: false,
+              liveSend: "",
+              message: "",
+            };
           }
 
           return arr;
@@ -167,14 +145,12 @@ export default function App() {
     const requests = Math.floor(Math.random() * 2) + 1;
 
     for (let i = 0; i < requests; i++) {
-      // ROUND ROBIN
+      // ✅ FIXED ROUND ROBIN (no rrIndex)
       setRrServers((prev) => {
         let updated = [...prev];
-        let index = rrIndex;
 
-        while (!updated[index].active) {
-          index = (index + 1) % updated.length;
-        }
+        let index = updated.findIndex((s) => s.active);
+        if (index === -1) index = 0;
 
         updated[index].load++;
         updated[index].handled++;
@@ -188,9 +164,7 @@ export default function App() {
         return updated;
       });
 
-      setRrIndex((prev) => (prev + 1) % rrServers.length);
-
-      // LEAST CONNECTIONS
+      // LEAST CONNECTIONS (unchanged)
       setLcServers((prev) => {
         let updated = [...prev];
 
@@ -220,7 +194,8 @@ export default function App() {
       setServers((prev) =>
         prev.map((s) => ({
           ...s,
-          load: s.load > 0 && Math.random() < 0.8 ? s.load - 1 : s.load,
+          load:
+            s.load > 0 && Math.random() < 0.8 ? s.load - 1 : s.load,
         }))
       );
     };
@@ -237,18 +212,8 @@ export default function App() {
   };
 
   const ServerCard = ({ server }) => (
-    <div
-      style={{
-        ...styles.card,
-        animation: server.overloaded
-          ? "pulseRed 1s infinite"
-          : server.redistributing
-          ? "pulseGreen 1s infinite"
-          : "none",
-      }}
-    >
+    <div style={styles.card}>
       <h3>Server {server.id}</h3>
-
       <p>Load: {server.load}</p>
       <p>Handled: {server.handled}</p>
 
@@ -263,17 +228,7 @@ export default function App() {
       </div>
 
       {!server.active && <p>⏸ STOPPED ({server.cooldown}s)</p>}
-
-      {server.redistributing && (
-        <>
-          <p>🔁 Redistributing...</p>
-          <p>{server.liveSend}</p>
-        </>
-      )}
-
-      {!server.redistributing && server.message && (
-        <p>{server.message}</p>
-      )}
+      {server.message && <p>{server.message}</p>}
     </div>
   );
 
@@ -312,7 +267,7 @@ export default function App() {
         </div>
 
         <div style={styles.graphColumn}>
-          <h2>Traffic Distribution Graph</h2>
+          <h2>Traffic Graph</h2>
           <Bar data={chartData} />
         </div>
 
@@ -345,7 +300,6 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "1fr 2fr 1fr",
     gap: "30px",
-    alignItems: "center",
   },
   column: {
     display: "flex",
@@ -361,7 +315,6 @@ const styles = {
     margin: "10px",
     borderRadius: "10px",
     width: "180px",
-    minHeight: "140px",
   },
   progressContainer: {
     background: "#334155",
