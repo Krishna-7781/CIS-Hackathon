@@ -12,6 +12,7 @@ import { Bar } from "react-chartjs-2";
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 const SERVER_COUNT = 3;
+const MAX_SERVERS = 4;
 const OVERLOAD_THRESHOLD = 6;
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [running, rrIndex]);
 
+  // ✅ UPDATED SCALING LOGIC (STOP AFTER ALERT)
   const checkScaling = (servers, setServers) => {
     const allOverloaded = servers.every(
       (s) => s.load >= OVERLOAD_THRESHOLD
@@ -76,11 +78,14 @@ export default function App() {
         },
       ]);
     } else if (servers.length === 4) {
-      console.log("🚨 All servers overloaded! Limit reached.");
+      alert("🚨 All servers overloaded! Server creation limit exceeded.");
+
+      // ✅ IMPORTANT FIX
       setRunning(false);
     }
   };
 
+  // 🔥 ORIGINAL OVERLOAD LOGIC (UNCHANGED)
   const handleOverload = (setServers, index) => {
     setServers((prev) => {
       const updated = [...prev];
@@ -104,6 +109,7 @@ export default function App() {
       if (receivers.length && excess > 0) {
         receivers.forEach((r) => {
           const share = Math.ceil(excess / receivers.length);
+
           r.load += share;
           r.handled += share;
 
@@ -135,12 +141,18 @@ export default function App() {
             s.cooldown -= 1;
           } else {
             clearInterval(timer);
+
             s.cooldown = 0;
             s.active = true;
             s.overloaded = false;
             s.redistributing = false;
             s.liveSend = "";
-            s.message = msg ? "" : "✔ Redistribution not required";
+
+            if (!msg) {
+              s.message = "✔ Redistribution not required";
+            } else {
+              s.message = "";
+            }
           }
 
           return arr;
@@ -155,7 +167,7 @@ export default function App() {
     const requests = Math.floor(Math.random() * 2) + 1;
 
     for (let i = 0; i < requests; i++) {
-      // Round Robin
+      // ROUND ROBIN
       setRrServers((prev) => {
         let updated = [...prev];
         let index = rrIndex;
@@ -172,12 +184,13 @@ export default function App() {
         }
 
         checkScaling(updated, setRrServers);
+
         return updated;
       });
 
       setRrIndex((prev) => (prev + 1) % rrServers.length);
 
-      // Least Connections
+      // LEAST CONNECTIONS
       setLcServers((prev) => {
         let updated = [...prev];
 
@@ -196,6 +209,7 @@ export default function App() {
         }
 
         checkScaling(updated, setLcServers);
+
         return updated;
       });
     }
@@ -223,8 +237,18 @@ export default function App() {
   };
 
   const ServerCard = ({ server }) => (
-    <div style={styles.card}>
+    <div
+      style={{
+        ...styles.card,
+        animation: server.overloaded
+          ? "pulseRed 1s infinite"
+          : server.redistributing
+          ? "pulseGreen 1s infinite"
+          : "none",
+      }}
+    >
       <h3>Server {server.id}</h3>
+
       <p>Load: {server.load}</p>
       <p>Handled: {server.handled}</p>
 
@@ -337,6 +361,7 @@ const styles = {
     margin: "10px",
     borderRadius: "10px",
     width: "180px",
+    minHeight: "140px",
   },
   progressContainer: {
     background: "#334155",
