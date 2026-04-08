@@ -42,7 +42,7 @@ export default function App() {
     const interval = setInterval(() => {
       generateTraffic();
       processCompletion();
-    }, 500); // ✅ FIXED
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [running, rrIndex]);
@@ -160,9 +160,11 @@ export default function App() {
   };
 
   const generateTraffic = () => {
-    const requests = Math.floor(Math.random() * 4) + 2; // ✅ FIXED
+    const requests = Math.floor(Math.random() * 2) + 1;
 
-    for (let i = 0; i < requests; i++) {
+    // ✅ ONLY FIX (replace for-loop)
+    Array.from({ length: requests }).forEach(() => {
+
       setRrServers((prev) => {
         let updated = [...prev];
         let index = rrIndex;
@@ -179,7 +181,6 @@ export default function App() {
         }
 
         checkScaling(updated, setRrServers);
-
         return updated;
       });
 
@@ -203,10 +204,10 @@ export default function App() {
         }
 
         checkScaling(updated, setLcServers);
-
         return updated;
       });
-    }
+
+    });
   };
 
   const processCompletion = () => {
@@ -214,7 +215,7 @@ export default function App() {
       setServers((prev) =>
         prev.map((s) => ({
           ...s,
-          load: s.load > 0 && Math.random() < 0.4 ? s.load - 1 : s.load, // ✅ FIXED
+          load: s.load > 0 && Math.random() < 0.8 ? s.load - 1 : s.load,
         }))
       );
     };
@@ -231,7 +232,7 @@ export default function App() {
   };
 
   const ServerCard = ({ server }) => (
-    <div style={{ ...styles.card }}>
+    <div style={styles.card}>
       <h3>Server {server.id}</h3>
       <p>Load: {server.load}</p>
       <p>Handled: {server.handled}</p>
