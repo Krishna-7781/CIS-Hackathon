@@ -1,5 +1,3 @@
-// FINAL VERCEL-SAFE CODE
-
 import { useState, useEffect, useRef } from "react";
 import {
   Chart as ChartJS,
@@ -49,6 +47,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [running, rrIndex]);
 
+  // ✅ UPDATED SCALING LOGIC (STOP AFTER ALERT)
   const checkScaling = (servers, setServers) => {
     const allOverloaded = servers.every(
       (s) => s.load >= OVERLOAD_THRESHOLD
@@ -80,10 +79,13 @@ export default function App() {
       ]);
     } else if (servers.length === 4) {
       alert("🚨 All servers overloaded! Server creation limit exceeded.");
+
+      // ✅ IMPORTANT FIX
       setRunning(false);
     }
   };
 
+  // 🔥 ORIGINAL OVERLOAD LOGIC (UNCHANGED)
   const handleOverload = (setServers, index) => {
     setServers((prev) => {
       const updated = [...prev];
@@ -102,14 +104,32 @@ export default function App() {
       server.load = OVERLOAD_THRESHOLD;
 
       const receivers = updated.filter((s, i) => i !== index && s.active);
+      const redistribution = {};
 
       if (receivers.length && excess > 0) {
         receivers.forEach((r) => {
           const share = Math.ceil(excess / receivers.length);
+
           r.load += share;
           r.handled += share;
+
+          redistribution[`S${r.id}`] =
+            (redistribution[`S${r.id}`] || 0) + share;
+
           r.message = `⬅ From S${server.id} (+${share})`;
         });
+      }
+
+      const msg = Object.entries(redistribution)
+        .map(([s, c]) => `${s}(${c})`)
+        .join(", ");
+
+      if (msg) {
+        server.liveSend = `📤 Sending to: ${msg}`;
+      } else if (excess > 0 && receivers.length === 0) {
+        server.liveSend = "⚠ No servers available";
+      } else {
+        server.liveSend = "✔ No redistribution needed";
       }
 
       const timer = setInterval(() => {
@@ -121,12 +141,18 @@ export default function App() {
             s.cooldown -= 1;
           } else {
             clearInterval(timer);
+
             s.cooldown = 0;
             s.active = true;
             s.overloaded = false;
             s.redistributing = false;
             s.liveSend = "";
-            s.message = "";
+
+            if (!msg) {
+              s.message = "✔ Redistribution not required";
+            } else {
+              s.message = "";
+            }
           }
 
           return arr;
@@ -141,15 +167,13 @@ export default function App() {
     const requests = Math.floor(Math.random() * 2) + 1;
 
     for (let i = 0; i < requests; i++) {
+      // ROUND ROBIN
       setRrServers((prev) => {
         let updated = [...prev];
         let index = rrIndex;
 
-        // ✅ SAFE LOOP
-        let safety = 0;
-        while (!updated[index].active && safety < updated.length) {
+        while (!updated[index].active) {
           index = (index + 1) % updated.length;
-          safety++;
         }
 
         updated[index].load++;
@@ -160,12 +184,13 @@ export default function App() {
         }
 
         checkScaling(updated, setRrServers);
+
         return updated;
       });
 
-      // ✅ SAFE INDEX FIX
-      setRrIndex((prev) => (prev + 1) % Math.max(1, rrServers.length));
+      setRrIndex((prev) => (prev + 1) % rrServers.length);
 
+      // LEAST CONNECTIONS
       setLcServers((prev) => {
         let updated = [...prev];
 
@@ -184,6 +209,7 @@ export default function App() {
         }
 
         checkScaling(updated, setLcServers);
+
         return updated;
       });
     }
@@ -211,10 +237,43 @@ export default function App() {
   };
 
   const ServerCard = ({ server }) => (
-    <div style={styles.card}>
+    <div
+      style={{
+        ...styles.card,
+        animation: server.overloaded
+          ? "pulseRed 1s infinite"
+          : server.redistributing
+          ? "pulseGreen 1s infinite"
+          : "none",
+      }}
+    >
       <h3>Server {server.id}</h3>
+
       <p>Load: {server.load}</p>
       <p>Handled: {server.handled}</p>
+
+      <div style={styles.progressContainer}>
+        <div
+          style={{
+            ...styles.progressBar,
+            width: `${Math.min(server.load * 10, 100)}%`,
+            background: server.active ? "#22c55e" : "#6b7280",
+          }}
+        />
+      </div>
+
+      {!server.active && <p>⏸ STOPPED ({server.cooldown}s)</p>}
+
+      {server.redistributing && (
+        <>
+          <p>🔁 Redistributing...</p>
+          <p>{server.liveSend}</p>
+        </>
+      )}
+
+      {!server.redistributing && server.message && (
+        <p>{server.message}</p>
+      )}
     </div>
   );
 
