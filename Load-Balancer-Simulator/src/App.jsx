@@ -1,4 +1,12 @@
 import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic"; // ✅ important
+
+// ✅ Fix Chart.js SSR issue
+const Bar = dynamic(
+  () => import("react-chartjs-2").then((mod) => mod.Bar),
+  { ssr: false }
+);
+
 import {
   Chart as ChartJS,
   BarElement,
@@ -7,7 +15,6 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { Bar } from "react-chartjs-2";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -47,7 +54,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [running, rrIndex]);
 
-  // ✅ UPDATED SCALING LOGIC (STOP AFTER ALERT)
+  // ✅ FIXED (no alert)
   const checkScaling = (servers, setServers) => {
     const allOverloaded = servers.every(
       (s) => s.load >= OVERLOAD_THRESHOLD
@@ -78,14 +85,11 @@ export default function App() {
         },
       ]);
     } else if (servers.length === 4) {
-      alert("🚨 All servers overloaded! Server creation limit exceeded.");
-
-      // ✅ IMPORTANT FIX
+      console.log("🚨 All servers overloaded! Limit reached.");
       setRunning(false);
     }
   };
 
-  // 🔥 ORIGINAL OVERLOAD LOGIC (UNCHANGED)
   const handleOverload = (setServers, index) => {
     setServers((prev) => {
       const updated = [...prev];
@@ -109,7 +113,6 @@ export default function App() {
       if (receivers.length && excess > 0) {
         receivers.forEach((r) => {
           const share = Math.ceil(excess / receivers.length);
-
           r.load += share;
           r.handled += share;
 
@@ -141,18 +144,12 @@ export default function App() {
             s.cooldown -= 1;
           } else {
             clearInterval(timer);
-
             s.cooldown = 0;
             s.active = true;
             s.overloaded = false;
             s.redistributing = false;
             s.liveSend = "";
-
-            if (!msg) {
-              s.message = "✔ Redistribution not required";
-            } else {
-              s.message = "";
-            }
+            s.message = msg ? "" : "✔ Redistribution not required";
           }
 
           return arr;
@@ -167,7 +164,7 @@ export default function App() {
     const requests = Math.floor(Math.random() * 2) + 1;
 
     for (let i = 0; i < requests; i++) {
-      // ROUND ROBIN
+      // Round Robin
       setRrServers((prev) => {
         let updated = [...prev];
         let index = rrIndex;
@@ -184,13 +181,12 @@ export default function App() {
         }
 
         checkScaling(updated, setRrServers);
-
         return updated;
       });
 
       setRrIndex((prev) => (prev + 1) % rrServers.length);
 
-      // LEAST CONNECTIONS
+      // Least Connections
       setLcServers((prev) => {
         let updated = [...prev];
 
@@ -209,7 +205,6 @@ export default function App() {
         }
 
         checkScaling(updated, setLcServers);
-
         return updated;
       });
     }
@@ -237,18 +232,8 @@ export default function App() {
   };
 
   const ServerCard = ({ server }) => (
-    <div
-      style={{
-        ...styles.card,
-        animation: server.overloaded
-          ? "pulseRed 1s infinite"
-          : server.redistributing
-          ? "pulseGreen 1s infinite"
-          : "none",
-      }}
-    >
+    <div style={styles.card}>
       <h3>Server {server.id}</h3>
-
       <p>Load: {server.load}</p>
       <p>Handled: {server.handled}</p>
 
@@ -361,7 +346,6 @@ const styles = {
     margin: "10px",
     borderRadius: "10px",
     width: "180px",
-    minHeight: "140px",
   },
   progressContainer: {
     background: "#334155",
