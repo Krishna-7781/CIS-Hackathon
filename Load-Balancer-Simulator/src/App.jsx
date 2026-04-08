@@ -36,6 +36,7 @@ export default function App() {
 
   const scalingLock = useRef(false);
 
+  // ✅ FIXED: Stable interval
   useEffect(() => {
     if (!running) return;
 
@@ -45,9 +46,9 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [running, rrIndex]);
+  }, [running]);
 
-  // ✅ UPDATED SCALING LOGIC (STOP AFTER ALERT)
+  // ✅ FIXED: Scaling logic
   const checkScaling = (servers, setServers) => {
     const allOverloaded = servers.every(
       (s) => s.load >= OVERLOAD_THRESHOLD
@@ -62,11 +63,11 @@ export default function App() {
 
     scalingLock.current = true;
 
-    if (servers.length === 3) {
+    if (servers.length < MAX_SERVERS) {
       setServers((prev) => [
         ...prev,
         {
-          id: 4,
+          id: prev.length + 1,
           load: 0,
           handled: 0,
           active: true,
@@ -77,46 +78,83 @@ export default function App() {
           liveSend: "",
         },
       ]);
-    } else if (servers.length === 4) {
-      alert("🚨 All servers overloaded! Server creation limit exceeded.");
-
-      // ✅ IMPORTANT FIX
+    } else {
+      alert("🚨 All servers overloaded! Limit reached.");
       setRunning(false);
     }
   };
 
-  // 🔥 ORIGINAL OVERLOAD LOGIC (UNCHANGED)
+  // ✅ FIXED: No nested interval bug
+  const startCooldown = (setServers, index) => {
+    const run = () => {
+      setServers((prev) => {
+        const arr = [...prev];
+        const s = arr[index];
+
+        if (!s) return prev;
+
+        if (s.cooldown > 1) {
+          arr[index] = { ...s, cooldown: s.cooldown - 1 };
+          setTimeout(run, 1000);
+        } else {
+          arr[index] = {
+            ...s,
+            cooldown: 0,
+            active: true,
+            overloaded: false,
+            redistributing: false,
+            liveSend: "",
+            message: "",
+          };
+        }
+
+        return arr;
+      });
+    };
+
+    setTimeout(run, 1000);
+  };
+
   const handleOverload = (setServers, index) => {
     setServers((prev) => {
-      const updated = [...prev];
-      const server = updated[index];
+      let updated = prev.map((s) => ({ ...s }));
+      let server = updated[index];
 
       if (!server.active) return prev;
 
-      server.overloaded = true;
-      server.active = false;
-      server.cooldown = 5;
-      server.redistributing = true;
-      server.message = "";
-      server.liveSend = "";
-
       const excess = server.load - OVERLOAD_THRESHOLD;
-      server.load = OVERLOAD_THRESHOLD;
+
+      updated[index] = {
+        ...server,
+        load: OVERLOAD_THRESHOLD,
+        active: false,
+        overloaded: true,
+        redistributing: true,
+        cooldown: 5,
+        message: "",
+        liveSend: "",
+      };
 
       const receivers = updated.filter((s, i) => i !== index && s.active);
-      const redistribution = {};
+
+      let redistribution = {};
 
       if (receivers.length && excess > 0) {
-        receivers.forEach((r) => {
-          const share = Math.ceil(excess / receivers.length);
+        const share = Math.ceil(excess / receivers.length);
 
-          r.load += share;
-          r.handled += share;
+        updated = updated.map((s, i) => {
+          if (i !== index && s.active) {
+            redistribution[`S${s.id}`] =
+              (redistribution[`S${s.id}`] || 0) + share;
 
-          redistribution[`S${r.id}`] =
-            (redistribution[`S${r.id}`] || 0) + share;
-
-          r.message = `⬅ From S${server.id} (+${share})`;
+            return {
+              ...s,
+              load: s.load + share,
+              handled: s.handled + share,
+              message: `⬅ From S${server.id} (+${share})`,
+            };
+          }
+          return s;
         });
       }
 
@@ -124,40 +162,13 @@ export default function App() {
         .map(([s, c]) => `${s}(${c})`)
         .join(", ");
 
-      if (msg) {
-        server.liveSend = `📤 Sending to: ${msg}`;
-      } else if (excess > 0 && receivers.length === 0) {
-        server.liveSend = "⚠ No servers available";
-      } else {
-        server.liveSend = "✔ No redistribution needed";
-      }
+      updated[index].liveSend = msg
+        ? `📤 Sending to: ${msg}`
+        : excess > 0
+        ? "⚠ No servers available"
+        : "✔ No redistribution needed";
 
-      const timer = setInterval(() => {
-        setServers((prev2) => {
-          const arr = [...prev2];
-          const s = arr[index];
-
-          if (s.cooldown > 1) {
-            s.cooldown -= 1;
-          } else {
-            clearInterval(timer);
-
-            s.cooldown = 0;
-            s.active = true;
-            s.overloaded = false;
-            s.redistributing = false;
-            s.liveSend = "";
-
-            if (!msg) {
-              s.message = "✔ Redistribution not required";
-            } else {
-              s.message = "";
-            }
-          }
-
-          return arr;
-        });
-      }, 1000);
+      startCooldown(setServers, index);
 
       return updated;
     });
@@ -169,15 +180,16 @@ export default function App() {
     for (let i = 0; i < requests; i++) {
       // ROUND ROBIN
       setRrServers((prev) => {
-        let updated = [...prev];
+        let updated = prev.map((s) => ({ ...s }));
+
         let index = rrIndex;
 
         while (!updated[index].active) {
           index = (index + 1) % updated.length;
         }
 
-        updated[index].load++;
-        updated[index].handled++;
+        updated[index].load += 1;
+        updated[index].handled += 1;
 
         if (updated[index].load > OVERLOAD_THRESHOLD) {
           handleOverload(setRrServers, index);
@@ -188,21 +200,22 @@ export default function App() {
         return updated;
       });
 
-      setRrIndex((prev) => (prev + 1) % rrServers.length);
+      setRrIndex((prev) => (prev + 1) % MAX_SERVERS);
 
       // LEAST CONNECTIONS
       setLcServers((prev) => {
-        let updated = [...prev];
+        let updated = prev.map((s) => ({ ...s }));
 
         const active = updated.filter((s) => s.active);
+
         const target = active.length
           ? active.reduce((min, s) => (s.load < min.load ? s : min))
           : updated[0];
 
         const index = updated.indexOf(target);
 
-        updated[index].load++;
-        updated[index].handled++;
+        updated[index].load += 1;
+        updated[index].handled += 1;
 
         if (updated[index].load > OVERLOAD_THRESHOLD) {
           handleOverload(setLcServers, index);
@@ -220,7 +233,8 @@ export default function App() {
       setServers((prev) =>
         prev.map((s) => ({
           ...s,
-          load: s.load > 0 && Math.random() < 0.8 ? s.load - 1 : s.load,
+          load:
+            s.load > 0 && Math.random() < 0.8 ? s.load - 1 : s.load,
         }))
       );
     };
@@ -248,7 +262,6 @@ export default function App() {
       }}
     >
       <h3>Server {server.id}</h3>
-
       <p>Load: {server.load}</p>
       <p>Handled: {server.handled}</p>
 
