@@ -100,32 +100,14 @@ export default function App() {
       server.load = OVERLOAD_THRESHOLD;
 
       const receivers = updated.filter((s, i) => i !== index && s.active);
-      const redistribution = {};
 
       if (receivers.length && excess > 0) {
         receivers.forEach((r) => {
           const share = Math.ceil(excess / receivers.length);
-
           r.load += share;
           r.handled += share;
-
-          redistribution[`S${r.id}`] =
-            (redistribution[`S${r.id}`] || 0) + share;
-
           r.message = `⬅ From S${server.id} (+${share})`;
         });
-      }
-
-      const msg = Object.entries(redistribution)
-        .map(([s, c]) => `${s}(${c})`)
-        .join(", ");
-
-      if (msg) {
-        server.liveSend = `📤 Sending to: ${msg}`;
-      } else if (excess > 0 && receivers.length === 0) {
-        server.liveSend = "⚠ No servers available";
-      } else {
-        server.liveSend = "✔ No redistribution needed";
       }
 
       const timer = setInterval(() => {
@@ -137,18 +119,12 @@ export default function App() {
             s.cooldown -= 1;
           } else {
             clearInterval(timer);
-
             s.cooldown = 0;
             s.active = true;
             s.overloaded = false;
             s.redistributing = false;
             s.liveSend = "";
-
-            if (!msg) {
-              s.message = "✔ Redistribution not required";
-            } else {
-              s.message = "";
-            }
+            s.message = "";
           }
 
           return arr;
@@ -162,9 +138,7 @@ export default function App() {
   const generateTraffic = () => {
     const requests = Math.floor(Math.random() * 2) + 1;
 
-    // ✅ ONLY FIX (replace for-loop)
-    Array.from({ length: requests }).forEach(() => {
-
+    for (let i = 0; i < requests; i++) {
       setRrServers((prev) => {
         let updated = [...prev];
         let index = rrIndex;
@@ -184,7 +158,8 @@ export default function App() {
         return updated;
       });
 
-      setRrIndex((prev) => (prev + 1) % rrServers.length);
+      // ✅ FINAL FIX
+      setRrIndex((prev) => (prev + 1) % MAX_SERVERS);
 
       setLcServers((prev) => {
         let updated = [...prev];
@@ -206,8 +181,7 @@ export default function App() {
         checkScaling(updated, setLcServers);
         return updated;
       });
-
-    });
+    }
   };
 
   const processCompletion = () => {
@@ -265,7 +239,26 @@ export default function App() {
         <button onClick={reset}>Reset</button>
       </div>
 
-      <Bar data={chartData} />
+      <div style={styles.layout}>
+        <div style={styles.column}>
+          <h2>Round Robin</h2>
+          {rrServers.map((s) => (
+            <ServerCard key={s.id} server={s} />
+          ))}
+        </div>
+
+        <div style={styles.graphColumn}>
+          <h2>Traffic Distribution Graph</h2>
+          <Bar data={chartData} />
+        </div>
+
+        <div style={styles.column}>
+          <h2>Least Connections</h2>
+          {lcServers.map((s) => (
+            <ServerCard key={s.id} server={s} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -283,5 +276,36 @@ const styles = {
     justifyContent: "center",
     gap: "15px",
     marginBottom: "20px",
+  },
+  layout: {
+    display: "grid",
+    gridTemplateColumns: "1fr 2fr 1fr",
+    gap: "30px",
+    alignItems: "center",
+  },
+  column: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  graphColumn: {
+    width: "100%",
+  },
+  card: {
+    background: "#1e293b",
+    padding: "12px",
+    margin: "10px",
+    borderRadius: "10px",
+    width: "180px",
+    minHeight: "140px",
+  },
+  progressContainer: {
+    background: "#334155",
+    height: "8px",
+    borderRadius: "5px",
+    marginTop: "8px",
+  },
+  progressBar: {
+    height: "100%",
   },
 };
