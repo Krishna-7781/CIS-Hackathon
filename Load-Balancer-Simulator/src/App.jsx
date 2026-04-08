@@ -1,12 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import dynamic from "next/dynamic"; // ✅ important
-
-// ✅ Fix Chart.js SSR issue
-const Bar = dynamic(
-  () => import("react-chartjs-2").then((mod) => mod.Bar),
-  { ssr: false }
-);
-
 import {
   Chart as ChartJS,
   BarElement,
@@ -15,11 +7,11 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { Bar } from "react-chartjs-2";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 const SERVER_COUNT = 3;
-const MAX_SERVERS = 4;
 const OVERLOAD_THRESHOLD = 6;
 
 export default function App() {
@@ -54,7 +46,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [running, rrIndex]);
 
-  // ✅ FIXED (no alert)
   const checkScaling = (servers, setServers) => {
     const allOverloaded = servers.every(
       (s) => s.load >= OVERLOAD_THRESHOLD
