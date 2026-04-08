@@ -36,7 +36,7 @@ export default function App() {
 
   const scalingLock = useRef(false);
 
-  // ✅ FIXED: Stable interval
+  // ✅ Stable interval (NO bugs)
   useEffect(() => {
     if (!running) return;
 
@@ -48,43 +48,49 @@ export default function App() {
     return () => clearInterval(interval);
   }, [running]);
 
-  // ✅ FIXED: Scaling logic
-  const checkScaling = (servers, setServers) => {
-    const allOverloaded = servers.every(
-      (s) => s.load >= OVERLOAD_THRESHOLD
-    );
+  // ✅ FIXED SCALING (MAIN FIX)
+  const checkScaling = (setServers) => {
+    setServers((prev) => {
+      const allOverloaded = prev.every(
+        (s) => s.load >= OVERLOAD_THRESHOLD
+      );
 
-    if (!allOverloaded) {
-      scalingLock.current = false;
-      return;
-    }
+      if (!allOverloaded) {
+        scalingLock.current = false;
+        return prev;
+      }
 
-    if (scalingLock.current) return;
+      if (scalingLock.current) return prev;
 
-    scalingLock.current = true;
+      scalingLock.current = true;
 
-    if (servers.length < MAX_SERVERS) {
-      setServers((prev) => [
-        ...prev,
-        {
-          id: prev.length + 1,
-          load: 0,
-          handled: 0,
-          active: true,
-          overloaded: false,
-          redistributing: false,
-          cooldown: 0,
-          message: "🆕 Auto-created",
-          liveSend: "",
-        },
-      ]);
-    } else {
-      alert("🚨 All servers overloaded! Limit reached.");
+      // ✅ ADD 4TH SERVER
+      if (prev.length < MAX_SERVERS) {
+        return [
+          ...prev,
+          {
+            id: prev.length + 1,
+            load: 0,
+            handled: 0,
+            active: true,
+            overloaded: false,
+            redistributing: false,
+            cooldown: 0,
+            message: "🆕 Auto-created",
+            liveSend: "",
+          },
+        ];
+      }
+
+      // ✅ ALERT WHEN ALL 4 OVERLOADED
+      alert("🚨 All servers overloaded! Server creation limit exceeded.");
       setRunning(false);
-    }
+
+      return prev;
+    });
   };
 
-  // ✅ FIXED: No nested interval bug
+  // ✅ Cooldown without interval bug
   const startCooldown = (setServers, index) => {
     const run = () => {
       setServers((prev) => {
@@ -195,12 +201,12 @@ export default function App() {
           handleOverload(setRrServers, index);
         }
 
-        checkScaling(updated, setRrServers);
-
         return updated;
       });
 
       setRrIndex((prev) => (prev + 1) % MAX_SERVERS);
+
+      checkScaling(setRrServers);
 
       // LEAST CONNECTIONS
       setLcServers((prev) => {
@@ -221,10 +227,10 @@ export default function App() {
           handleOverload(setLcServers, index);
         }
 
-        checkScaling(updated, setLcServers);
-
         return updated;
       });
+
+      checkScaling(setLcServers);
     }
   };
 
@@ -251,16 +257,7 @@ export default function App() {
   };
 
   const ServerCard = ({ server }) => (
-    <div
-      style={{
-        ...styles.card,
-        animation: server.overloaded
-          ? "pulseRed 1s infinite"
-          : server.redistributing
-          ? "pulseGreen 1s infinite"
-          : "none",
-      }}
-    >
+    <div style={styles.card}>
       <h3>Server {server.id}</h3>
       <p>Load: {server.load}</p>
       <p>Handled: {server.handled}</p>
@@ -276,17 +273,8 @@ export default function App() {
       </div>
 
       {!server.active && <p>⏸ STOPPED ({server.cooldown}s)</p>}
-
-      {server.redistributing && (
-        <>
-          <p>🔁 Redistributing...</p>
-          <p>{server.liveSend}</p>
-        </>
-      )}
-
-      {!server.redistributing && server.message && (
-        <p>{server.message}</p>
-      )}
+      {server.redistributing && <p>{server.liveSend}</p>}
+      {!server.redistributing && server.message && <p>{server.message}</p>}
     </div>
   );
 
@@ -325,7 +313,7 @@ export default function App() {
         </div>
 
         <div style={styles.graphColumn}>
-          <h2>Traffic Distribution Graph</h2>
+          <h2>Traffic Graph</h2>
           <Bar data={chartData} />
         </div>
 
@@ -358,7 +346,6 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "1fr 2fr 1fr",
     gap: "30px",
-    alignItems: "center",
   },
   column: {
     display: "flex",
@@ -374,7 +361,6 @@ const styles = {
     margin: "10px",
     borderRadius: "10px",
     width: "180px",
-    minHeight: "140px",
   },
   progressContainer: {
     background: "#334155",
