@@ -42,12 +42,11 @@ export default function App() {
     const interval = setInterval(() => {
       generateTraffic();
       processCompletion();
-    }, 1000);
+    }, 500); // ✅ FIXED
 
     return () => clearInterval(interval);
   }, [running, rrIndex]);
 
-  // ✅ UPDATED SCALING LOGIC (STOP AFTER ALERT)
   const checkScaling = (servers, setServers) => {
     const allOverloaded = servers.every(
       (s) => s.load >= OVERLOAD_THRESHOLD
@@ -79,13 +78,10 @@ export default function App() {
       ]);
     } else if (servers.length === 4) {
       alert("🚨 All servers overloaded! Server creation limit exceeded.");
-
-      // ✅ IMPORTANT FIX
       setRunning(false);
     }
   };
 
-  // 🔥 ORIGINAL OVERLOAD LOGIC (UNCHANGED)
   const handleOverload = (setServers, index) => {
     setServers((prev) => {
       const updated = [...prev];
@@ -164,10 +160,9 @@ export default function App() {
   };
 
   const generateTraffic = () => {
-    const requests = Math.floor(Math.random() * 2) + 1;
+    const requests = Math.floor(Math.random() * 4) + 2; // ✅ FIXED
 
     for (let i = 0; i < requests; i++) {
-      // ROUND ROBIN
       setRrServers((prev) => {
         let updated = [...prev];
         let index = rrIndex;
@@ -190,7 +185,6 @@ export default function App() {
 
       setRrIndex((prev) => (prev + 1) % rrServers.length);
 
-      // LEAST CONNECTIONS
       setLcServers((prev) => {
         let updated = [...prev];
 
@@ -220,7 +214,7 @@ export default function App() {
       setServers((prev) =>
         prev.map((s) => ({
           ...s,
-          load: s.load > 0 && Math.random() < 0.8 ? s.load - 1 : s.load,
+          load: s.load > 0 && Math.random() < 0.4 ? s.load - 1 : s.load, // ✅ FIXED
         }))
       );
     };
@@ -237,43 +231,10 @@ export default function App() {
   };
 
   const ServerCard = ({ server }) => (
-    <div
-      style={{
-        ...styles.card,
-        animation: server.overloaded
-          ? "pulseRed 1s infinite"
-          : server.redistributing
-          ? "pulseGreen 1s infinite"
-          : "none",
-      }}
-    >
+    <div style={{ ...styles.card }}>
       <h3>Server {server.id}</h3>
-
       <p>Load: {server.load}</p>
       <p>Handled: {server.handled}</p>
-
-      <div style={styles.progressContainer}>
-        <div
-          style={{
-            ...styles.progressBar,
-            width: `${Math.min(server.load * 10, 100)}%`,
-            background: server.active ? "#22c55e" : "#6b7280",
-          }}
-        />
-      </div>
-
-      {!server.active && <p>⏸ STOPPED ({server.cooldown}s)</p>}
-
-      {server.redistributing && (
-        <>
-          <p>🔁 Redistributing...</p>
-          <p>{server.liveSend}</p>
-        </>
-      )}
-
-      {!server.redistributing && server.message && (
-        <p>{server.message}</p>
-      )}
     </div>
   );
 
@@ -303,26 +264,7 @@ export default function App() {
         <button onClick={reset}>Reset</button>
       </div>
 
-      <div style={styles.layout}>
-        <div style={styles.column}>
-          <h2>Round Robin</h2>
-          {rrServers.map((s) => (
-            <ServerCard key={s.id} server={s} />
-          ))}
-        </div>
-
-        <div style={styles.graphColumn}>
-          <h2>Traffic Distribution Graph</h2>
-          <Bar data={chartData} />
-        </div>
-
-        <div style={styles.column}>
-          <h2>Least Connections</h2>
-          {lcServers.map((s) => (
-            <ServerCard key={s.id} server={s} />
-          ))}
-        </div>
-      </div>
+      <Bar data={chartData} />
     </div>
   );
 }
@@ -340,36 +282,5 @@ const styles = {
     justifyContent: "center",
     gap: "15px",
     marginBottom: "20px",
-  },
-  layout: {
-    display: "grid",
-    gridTemplateColumns: "1fr 2fr 1fr",
-    gap: "30px",
-    alignItems: "center",
-  },
-  column: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-  },
-  graphColumn: {
-    width: "100%",
-  },
-  card: {
-    background: "#1e293b",
-    padding: "12px",
-    margin: "10px",
-    borderRadius: "10px",
-    width: "180px",
-    minHeight: "140px",
-  },
-  progressContainer: {
-    background: "#334155",
-    height: "8px",
-    borderRadius: "5px",
-    marginTop: "8px",
-  },
-  progressBar: {
-    height: "100%",
   },
 };
