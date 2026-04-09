@@ -25,7 +25,6 @@ export default function App() {
       redistributing: false,
       cooldown: 0,
       message: "",
-      liveSend: "",
     }));
 
   const [rrServers, setRrServers] = useState(createServers());
@@ -45,7 +44,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [running]);
 
-  // SCALING LOGIC
+  // 🔥 SCALING
   const checkScaling = (servers, setServers) => {
     const allOverloaded = servers.every(
       (s) => s.load >= OVERLOAD_THRESHOLD
@@ -72,7 +71,6 @@ export default function App() {
           redistributing: false,
           cooldown: 0,
           message: "🆕 Auto-created",
-          liveSend: "",
         },
       ]);
     } else if (servers.length === 4) {
@@ -81,18 +79,18 @@ export default function App() {
     }
   };
 
-  // OVERLOAD HANDLING
+  // 🔥 OVERLOAD HANDLING
   const handleOverload = (setServers, index) => {
     setServers((prev) => {
-      const updated = [...prev];
+      const updated = prev.map((s) => ({ ...s }));
       const server = updated[index];
 
       if (!server.active) return prev;
 
       server.overloaded = true;
+      server.redistributing = true;
       server.active = false;
       server.cooldown = 5;
-      server.redistributing = true;
 
       const excess = server.load - OVERLOAD_THRESHOLD;
       server.load = OVERLOAD_THRESHOLD;
@@ -115,7 +113,7 @@ export default function App() {
           const s = arr[index];
 
           if (s.cooldown > 1) {
-            s.cooldown -= 1;
+            arr[index].cooldown -= 1;
           } else {
             clearInterval(timer);
 
@@ -137,12 +135,13 @@ export default function App() {
     });
   };
 
-  // TRAFFIC GENERATION (BALANCED)
+  // 🔥 TRAFFIC (SMART CONTROL)
   const generateTraffic = () => {
-    const requests = Math.floor(Math.random() * 3) + 1; // 1–3 requests
+    const base = rrServers.length === 4 ? 4 : 2;
+    const requests = Math.floor(Math.random() * base) + base;
 
     for (let i = 0; i < requests; i++) {
-      // ROUND ROBIN (safe)
+      // ROUND ROBIN
       setRrServers((prev) => {
         let updated = [...prev];
 
@@ -184,7 +183,7 @@ export default function App() {
     }
   };
 
-  // PROCESS COMPLETION (BALANCED)
+  // 🔥 COMPLETION
   const processCompletion = () => {
     const process = (setServers) => {
       setServers((prev) =>
@@ -208,8 +207,18 @@ export default function App() {
   };
 
   const ServerCard = ({ server }) => (
-    <div style={styles.card}>
+    <div
+      style={{
+        ...styles.card,
+        animation: server.overloaded
+          ? "pulseRed 1s infinite"
+          : server.redistributing
+          ? "pulseGreen 1s infinite"
+          : "none",
+      }}
+    >
       <h3>Server {server.id}</h3>
+
       <p>Load: {server.load}</p>
       <p>Handled: {server.handled}</p>
 
@@ -224,7 +233,8 @@ export default function App() {
       </div>
 
       {!server.active && <p>⏸ STOPPED ({server.cooldown}s)</p>}
-      {server.message && <p>{server.message}</p>}
+      {server.redistributing && <p>🔁 Redistributing...</p>}
+      {!server.redistributing && server.message && <p>{server.message}</p>}
     </div>
   );
 
@@ -278,6 +288,7 @@ export default function App() {
   );
 }
 
+// 🔥 STYLES + ANIMATIONS
 const styles = {
   container: {
     padding: "20px",
@@ -311,6 +322,7 @@ const styles = {
     margin: "10px",
     borderRadius: "10px",
     width: "180px",
+    minHeight: "140px",
   },
   progressContainer: {
     background: "#334155",
@@ -322,3 +334,19 @@ const styles = {
     height: "100%",
   },
 };
+
+// 🔥 ADD KEYFRAMES
+const styleSheet = document.styleSheets[0];
+styleSheet.insertRule(`
+@keyframes pulseRed {
+  0% { box-shadow: 0 0 5px red; }
+  50% { box-shadow: 0 0 20px red; }
+  100% { box-shadow: 0 0 5px red; }
+}`, styleSheet.cssRules.length);
+
+styleSheet.insertRule(`
+@keyframes pulseGreen {
+  0% { box-shadow: 0 0 5px green; }
+  50% { box-shadow: 0 0 20px green; }
+  100% { box-shadow: 0 0 5px green; }
+}`, styleSheet.cssRules.length);
