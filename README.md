@@ -8,7 +8,14 @@ It demonstrates how traffic is distributed across servers using:
 * 🔵 **Round Robin Algorithm**
 * 🟢 **Least Connections Algorithm**
 
-The simulator also includes **dynamic scaling** and **overload handling**, making it a realistic representation of how modern systems manage server load.
+The simulator also includes **dynamic scaling**, **overload handling**, and **visual animations**, making it a realistic representation of how modern systems manage server load.
+
+---
+
+## 🌐 Live Demo
+
+🚀 **Vercel Deployed Link:**
+👉 https://cis-hackathon-gamma.vercel.app
 
 ---
 
@@ -17,8 +24,10 @@ The simulator also includes **dynamic scaling** and **overload handling**, makin
 * ✅ Real-time traffic simulation
 * ✅ Round Robin load balancing
 * ✅ Least Connections load balancing
-* ✅ Automatic server scaling
+* ✅ Automatic server scaling (3 → 4 servers)
 * ✅ Overload detection & redistribution
+* ✅ 🔴 Overload animation (red pulse)
+* ✅ 🟢 Redistribution animation (green pulse)
 * ✅ Visual traffic graph using Chart.js
 * ✅ Server cooldown & recovery system
 
@@ -36,7 +45,7 @@ The simulator also includes **dynamic scaling** and **overload handling**, makin
 ### 🔁 Load Distribution
 
 * **Round Robin** → Requests are assigned sequentially
-* **Least Connections** → Requests go to least loaded server
+* **Least Connections** → Requests go to the least loaded server
 
 ---
 
@@ -47,6 +56,7 @@ The simulator also includes **dynamic scaling** and **overload handling**, makin
   * It becomes **inactive**
   * Load is **redistributed** to other active servers
   * Cooldown period starts
+  * 🔴 Server shows **overload animation**
 
 ---
 
@@ -62,7 +72,7 @@ The simulator also includes **dynamic scaling** and **overload handling**, makin
 
 * If **all 4 servers are overloaded**:
 
-  * ⚠️ Alert message is shown
+  * ⚠️ Alert message is triggered
   * ⛔ Simulation stops
 
 ---
@@ -72,7 +82,7 @@ The simulator also includes **dynamic scaling** and **overload handling**, makin
 * Real-time bar chart showing:
 
   * Server loads
-  * Comparison between algorithms
+  * Comparison between Round Robin & Least Connections
 
 ---
 
@@ -113,15 +123,31 @@ npm run dev
 
 ## 🌐 Deployment
 
-This project is deployed using Netlify.
+This project is deployed using **Vercel**.
 
-To deploy manually:
+### Deploy Steps:
 
 ```bash
 npm run build
 ```
 
-Upload the `dist/` folder to Netlify.
+* Upload project to GitHub
+* Import into Vercel
+* Set:
+
+  * **Build Command:** `npm run build`
+  * **Output Directory:** `dist`
+
+---
+
+## 🎬 Demo Flow (For Presentation)
+
+1. Click **Start**
+2. Traffic gradually increases
+3. Servers begin to overload
+4. 🔁 Load redistribution happens
+5. ➕ 4th server is created
+6. 🚨 All servers overload → alert triggers
 
 ---
 
@@ -129,25 +155,29 @@ Upload the `dist/` folder to Netlify.
 
 * Add more load balancing algorithms
 * Add request queue visualization
-* Add user-controlled traffic rate
-* Improve UI animations
+* Add manual traffic control (slider)
+* Add performance metrics dashboard
+* Improve UI/UX animations
 
 ---
 
-## 👨‍💻 Author
+## 👨‍💻 Authors
 
-**A Sudarsan Krishna, N Sai Suhaas, P Rakesh, Y Karthikeya**
+* **A Sudarsan Krishna**
+* **N Sai Suhaas**
+* **P Rakesh**
+* **Y Karthikeya**
 
 ---
 
 ## ⭐ Acknowledgement
 
-This project was developed as part of a hackathon to demonstrate real-time system design concepts in an interactive way.
+This project was developed as part of a **hackathon** to demonstrate real-time system design concepts in an interactive way.
 
 ---
 
 ## 📌 Note
 
-Due to differences between development and production environments, minor behavior variations may occur in deployment platforms. The logic is optimized to work consistently across environments.
+Due to differences between development and production environments, slight timing variations may occur. The logic has been optimized to ensure consistent behavior across platforms like Vercel.
 
 ---
