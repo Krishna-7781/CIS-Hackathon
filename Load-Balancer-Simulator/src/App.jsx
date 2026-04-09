@@ -45,6 +45,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [running]);
 
+  // SCALING LOGIC
   const checkScaling = (servers, setServers) => {
     const allOverloaded = servers.every(
       (s) => s.load >= OVERLOAD_THRESHOLD
@@ -80,6 +81,7 @@ export default function App() {
     }
   };
 
+  // OVERLOAD HANDLING
   const handleOverload = (setServers, index) => {
     setServers((prev) => {
       const updated = [...prev];
@@ -91,8 +93,6 @@ export default function App() {
       server.active = false;
       server.cooldown = 5;
       server.redistributing = true;
-      server.message = "";
-      server.liveSend = "";
 
       const excess = server.load - OVERLOAD_THRESHOLD;
       server.load = OVERLOAD_THRESHOLD;
@@ -137,12 +137,12 @@ export default function App() {
     });
   };
 
+  // TRAFFIC GENERATION (BALANCED)
   const generateTraffic = () => {
-    // 🔥 INCREASED TRAFFIC FOR PROPER DEMO
-    const requests = Math.floor(Math.random() * 5) + 3; // 3–7 requests
+    const requests = Math.floor(Math.random() * 3) + 1; // 1–3 requests
 
     for (let i = 0; i < requests; i++) {
-      // ROUND ROBIN (fixed safe version)
+      // ROUND ROBIN (safe)
       setRrServers((prev) => {
         let updated = [...prev];
 
@@ -157,7 +157,6 @@ export default function App() {
         }
 
         checkScaling(updated, setRrServers);
-
         return updated;
       });
 
@@ -180,20 +179,19 @@ export default function App() {
         }
 
         checkScaling(updated, setLcServers);
-
         return updated;
       });
     }
   };
 
+  // PROCESS COMPLETION (BALANCED)
   const processCompletion = () => {
     const process = (setServers) => {
       setServers((prev) =>
         prev.map((s) => ({
           ...s,
-          // 🔥 REDUCED DECREASE RATE
           load:
-            s.load > 0 && Math.random() < 0.3 ? s.load - 1 : s.load,
+            s.load > 0 && Math.random() < 0.5 ? s.load - 1 : s.load,
         }))
       );
     };
